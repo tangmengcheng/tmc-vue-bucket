@@ -1,3 +1,14 @@
+## 搭建开发环境
+
+- rollup: 一般类库打包都使用 rollup,因为打包的 webpack5 体积小很多,主要用于打包 js 库。
+- rollup-plugin-babel: 在 rollup 中使用 babel 插件
+- @babel/core: babel 核心库
+- @babel/preset-env: 将高级语法转成低级语法，需要按着预设（let const => var、箭头函数、类等的转换）
+
+-c 指定配置文件、-w 监控文件变化
+
+**问题**：为什么 vue2 只能支持>=ie9 以上，Object.defineProperty()不支持低版本的（Proxy 是 es6 的，也没有替代的方案。 没有对应的 es5 语法模拟）
+
 1、Vue 是 MVVM 框架（基于 mvc 升级的，弱化了 controller 这一层） vue 每一完全遵循 mvvm，因为传统的 mvvm 框架是不能手动的操作数据的。（ref 可以操作组件数据）
 
 2、new Vue({})表示 Vue 肯定是一个类，vue 源码没有采用 class 方式，是因为类的特点：将所有的方法全部耦合在一起（全放一个文件），当功能越多，方法就越多，不好管理。vue 在设计上，使用构造函数，让一些方法全部扩展在原型上，将不同的扩展功能放到不同文件中，更加好维护一点和管理
