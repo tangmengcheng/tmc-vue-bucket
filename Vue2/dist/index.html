@@ -9,7 +9,13 @@
 <body>
     <script src="./vue.js"></script>
     <script>
-        console.log('vue', Vue)
+        // Vue的核心：响应式的数据变化 -》数据变化了可以监控到数据的变化，数据的取值和更改值要监控到
+        const vm = new Vue({
+            data: { // 代理的数据
+                name: 'tmc',
+                age: 18
+            }
+        })
     </script>
 </body>
 </html>
