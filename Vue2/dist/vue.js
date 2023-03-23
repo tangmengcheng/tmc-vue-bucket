@@ -202,6 +202,93 @@
     }
   }
 
+  // ast抽象语法树 是用对象来描述原生语法的  虚拟dom 用对象来描述dom节点
+  // ?: 匹配不捕获
+  var attribute = /^\s*([^\s"'<>\/=]+)(?:\s*(=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+)))?/; // 匹配属性的
+  // const dynamicArgAttribute = /^\s*((?:v-[\w-]+:|@|:|#)\[[^=]+?\][^\s"'<>\/=]*)(?:\s*(=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+)))?/
+  var ncname = "[a-zA-Z_][\\-\\.0-9_a-zA-Z]*"; // abc-aaa
+  var qnameCapture = "((?:".concat(ncname, "\\:)?").concat(ncname, ")"); // <aaa:asasas>
+  var startTagOpen = new RegExp("^<".concat(qnameCapture)); // 标签开头的正则  捕获的内容是标签名
+  // const defaultTagRE = /\{\{((?:.|\r?\n)+?)\}\}/g // {{}}
+  // const regexEscapeRE = /[-.*+?^${}()|[\]\/\\]/g
+
+  var startTagClose = /^\s*(\/?)>/; // 匹配标签结束的 > <div >
+  var endTag = new RegExp("^<\\/".concat(qnameCapture, "[^>]*>")); // 匹配标签结尾的</div>
+  // const doctype = /^<!DOCTYPE [^>]+>/i
+  // // #7298: escape - to avoid being passed as HTML comment when inlined in page
+  // const comment = /^<!\--/
+  // const conditionalComment = /^<!\[/ // 解析是否是条件注释
+
+  function start(tagName, attrs) {
+    console.log('开始标签：', tagName, '属性是：', attrs);
+  }
+  function chars(text) {
+    console.log('文本是：', text);
+  }
+  function end(tagName) {
+    console.log('结束标签：', tagName);
+  }
+  function parseHTML(html) {
+    // 不停地的解析HTML字符串
+    while (html) {
+      var textEnd = html.indexOf('<');
+      if (textEnd === 0) {
+        // 如果当前索引为0 肯定是一个标签，（开始标签、结束标签）
+        var startTagMatch = parseStartTag(); // 通过这个方法获取到匹配的结果，tagName attrs
+        if (startTagMatch) {
+          start(startTagMatch.tagName, startTagMatch.attrs);
+          continue; // 如果开始标签匹配完毕后，继续下一次
+        }
+
+        var endTagMatch = html.match(endTag); // 结束标签
+        if (endTagMatch) {
+          advance(endTagMatch[0].length);
+          end(endTagMatch[1]);
+          continue;
+        }
+      }
+      var text = void 0;
+      if (textEnd >= 0) {
+        text = html.substring(0, textEnd);
+      }
+      if (text) {
+        advance(text.length); // 去掉空的字符串
+        chars(text);
+      }
+    }
+    function advance(n) {
+      html = html.substring(n);
+    }
+    function parseStartTag() {
+      var start = html.match(startTagOpen);
+      if (start) {
+        var match = {
+          tagName: start[1],
+          attrs: []
+        };
+        advance(start[0].length); // 将标签删除
+        // console.log(html)
+        var _end, attr;
+        while (!(_end = html.match(startTagClose)) && (attr = html.match(attribute))) {
+          advance(attr[0].length); // 将属性删除
+          match.attrs.push({
+            name: attr[1],
+            value: attr[3] || attr[4] || attr[5]
+          });
+        }
+        if (_end) {
+          advance(_end[0].length); // 去掉开始标签的 > 
+          return match;
+        }
+        console.log(html, match);
+      }
+    }
+  }
+  function compilerToFunction(template) {
+    parseHTML(template);
+    return function render() {};
+  }
+
   // 初始化
   function initMixin(Vue) {
     Vue.prototype._init = function (options) {
@@ -215,6 +302,30 @@
       // 初始化状态/数据（Vue中的状态：props、data、computed、methods、watch）
       initState(vm);
       // todo...模板编译、创建虚拟dom。。。
+
+      // 如果用户传了el属性，需要将页面渲染出来
+      // 如果用户传入了el，就要实现挂载流程
+      if (vm.$options.el) {
+        vm.$mount(vm.$options.el);
+      }
+    };
+    Vue.prototype.$mount = function (el) {
+      var vm = this;
+      var options = vm.$options;
+      el = document.querySelector(el);
+      // 默认会先查找render方法，-》template -> el的内容
+
+      if (!options.render) {
+        // 对模板进行编译
+        var template = options.template;
+        if (!template && el) {
+          template = el.outerHTML;
+        }
+        console.log(template);
+        // 我们需要将template 转化成render函数
+        var render = compilerToFunction(template);
+        options.render = render;
+      }
     };
   }
 

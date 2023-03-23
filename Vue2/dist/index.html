@@ -7,17 +7,20 @@
     <title>Document</title>
 </head>
 <body>
+    <div id="app">  hello
+        <p>{{name}}</p>
+        <span>{{age}}</span>
+    </div>
     <script src="./vue.js"></script>
     <script>
         // Vue的核心：响应式的数据变化 -》数据变化了可以监控到数据的变化，数据的取值和更改值要监控到
         const vm = new Vue({
+            el: '#app',
             data: { // 代理的数据
                 name: 'tmc',
                 age: 18
             }
         })
-        console.log(vm._data.name)
-        console.log(vm.name)
     </script>
 </body>
 </html>
