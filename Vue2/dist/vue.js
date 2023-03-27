@@ -202,7 +202,6 @@
     }
   }
 
-  // ast抽象语法树 是用对象来描述原生语法的  虚拟dom 用对象来描述dom节点
   // ?: 匹配不捕获
   var attribute = /^\s*([^\s"'<>\/=]+)(?:\s*(=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+)))?/; // 匹配属性的
   // const dynamicArgAttribute = /^\s*((?:v-[\w-]+:|@|:|#)\[[^=]+?\][^\s"'<>\/=]*)(?:\s*(=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+)))?/
@@ -219,15 +218,58 @@
   // const comment = /^<!\--/
   // const conditionalComment = /^<!\[/ // 解析是否是条件注释
 
+  var root = null; // ast语法树的树根
+  var currentParent; // 标识当前父亲是谁
+  var stack = [];
+  var ELEMENT_TYPE = 1; // 元素
+  var TEXT_TYPE = 3; // 文本
+
+  function createASTElement(tagName, attrs) {
+    return {
+      tag: tagName,
+      type: ELEMENT_TYPE,
+      children: [],
+      attrs: attrs,
+      parent: null
+    };
+  }
+
+  // 开始
   function start(tagName, attrs) {
     console.log('开始标签：', tagName, '属性是：', attrs);
+    // 遇到开始标签  就创建一个ast元素
+    var element = createASTElement(tagName, attrs);
+    if (!root) {
+      root = element;
+    }
+    currentParent = element; // 把当前元素标记为父ast树
+    stack.push(element); // 将开始标签存入栈中
   }
+
+  // 文本
   function chars(text) {
     console.log('文本是：', text);
+    text = text.replace(/\s/g, '');
+    if (text) {
+      currentParent.children.push({
+        text: text,
+        type: TEXT_TYPE
+      });
+    }
   }
+
+  // 标签闭合
   function end(tagName) {
     console.log('结束标签：', tagName);
+    var element = stack.pop();
+    // 要标识当前这个p是属于这个div的儿子的
+    currentParent = stack[stack.length - 1];
+    if (currentParent) {
+      element.parent = currentParent;
+      currentParent.children.push(element); // 实现了一个树的父子关系
+    }
   }
+
   function parseHTML(html) {
     // 不停地的解析HTML字符串
     while (html) {
@@ -236,14 +278,14 @@
         // 如果当前索引为0 肯定是一个标签，（开始标签、结束标签）
         var startTagMatch = parseStartTag(); // 通过这个方法获取到匹配的结果，tagName attrs
         if (startTagMatch) {
-          start(startTagMatch.tagName, startTagMatch.attrs);
+          start(startTagMatch.tagName, startTagMatch.attrs); // 1、解析开始标签
           continue; // 如果开始标签匹配完毕后，继续下一次
         }
 
         var endTagMatch = html.match(endTag); // 结束标签
         if (endTagMatch) {
           advance(endTagMatch[0].length);
-          end(endTagMatch[1]);
+          end(endTagMatch[1]); // 2、解析结束标签
           continue;
         }
       }
@@ -253,9 +295,10 @@
       }
       if (text) {
         advance(text.length); // 去掉空的字符串
-        chars(text);
+        chars(text); // 3、解析文本
       }
     }
+
     function advance(n) {
       html = html.substring(n);
     }
@@ -283,9 +326,17 @@
         console.log(html, match);
       }
     }
+    return root;
   }
+
+  // ast抽象语法树 是用对象来描述原生语法的  虚拟dom 用对象来描述dom节点
+
+  // 主要通过正则匹配加循环来完成的
+  // 把一个HTML不停地循环拿出来后组成一棵树，这个树描述了我们当前的DOM结构
   function compilerToFunction(template) {
-    parseHTML(template);
+    // 1、解析HTML字符串，将HTML字符串 -》ast语法树
+    var root = parseHTML(template);
+    console.log(root);
     return function render() {};
   }
 
