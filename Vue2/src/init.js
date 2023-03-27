@@ -40,10 +40,11 @@ export function initMixin(Vue) {
             if (!template && el) {
                 template = el.outerHTML
             }
-            console.log(template)
+            // console.log(template)
             // 我们需要将template 转化成render函数
             const render = compilerToFunction(template)
             options.render = render
+            console.log(options.render)
         }
     }
 }

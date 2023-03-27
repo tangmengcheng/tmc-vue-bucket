@@ -4,6 +4,33 @@
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Vue = factory());
 })(this, (function () { 'use strict';
 
+  function _iterableToArrayLimit(arr, i) {
+    var _i = null == arr ? null : "undefined" != typeof Symbol && arr[Symbol.iterator] || arr["@@iterator"];
+    if (null != _i) {
+      var _s,
+        _e,
+        _x,
+        _r,
+        _arr = [],
+        _n = !0,
+        _d = !1;
+      try {
+        if (_x = (_i = _i.call(arr)).next, 0 === i) {
+          if (Object(_i) !== _i) return;
+          _n = !1;
+        } else for (; !(_n = (_s = _x.call(_i)).done) && (_arr.push(_s.value), _arr.length !== i); _n = !0);
+      } catch (err) {
+        _d = !0, _e = err;
+      } finally {
+        try {
+          if (!_n && null != _i.return && (_r = _i.return(), Object(_r) !== _r)) return;
+        } finally {
+          if (_d) throw _e;
+        }
+      }
+      return _arr;
+    }
+  }
   function _typeof(obj) {
     "@babel/helpers - typeof";
 
@@ -34,6 +61,28 @@
       writable: false
     });
     return Constructor;
+  }
+  function _slicedToArray(arr, i) {
+    return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest();
+  }
+  function _arrayWithHoles(arr) {
+    if (Array.isArray(arr)) return arr;
+  }
+  function _unsupportedIterableToArray(o, minLen) {
+    if (!o) return;
+    if (typeof o === "string") return _arrayLikeToArray(o, minLen);
+    var n = Object.prototype.toString.call(o).slice(8, -1);
+    if (n === "Object" && o.constructor) n = o.constructor.name;
+    if (n === "Map" || n === "Set") return Array.from(o);
+    if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen);
+  }
+  function _arrayLikeToArray(arr, len) {
+    if (len == null || len > arr.length) len = arr.length;
+    for (var i = 0, arr2 = new Array(len); i < len; i++) arr2[i] = arr[i];
+    return arr2;
+  }
+  function _nonIterableRest() {
+    throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
   }
   function _toPrimitive(input, hint) {
     if (typeof input !== "object" || input === null) return input;
@@ -329,16 +378,100 @@
     return root;
   }
 
-  // ast抽象语法树 是用对象来描述原生语法的  虚拟dom 用对象来描述dom节点
+  var defaultTagRE = /\{\{((?:.|\r?\n)+?)\}\}/g; // {{}}
+
+  // 处理属性  拼接成属性字符串
+  function getProps(attrs) {
+    var str = '';
+    var _loop = function _loop() {
+      var attr = attrs[i];
+      if (attr.name === 'style') {
+        // style="color: red;fontSize: 14px;"  => {style: {color: 'red'}}
+        var obj = {};
+        attr.value.split(';').forEach(function (item) {
+          var _item$split = item.split(':'),
+            _item$split2 = _slicedToArray(_item$split, 2),
+            key = _item$split2[0],
+            value = _item$split2[1];
+          obj[key] = value;
+        });
+        attr.value = obj;
+      }
+      str += "".concat(attr.name, ":").concat(JSON.stringify(attr.value), ",");
+    };
+    for (var i = 0; i < attrs.length; i++) {
+      _loop();
+    }
+    return "{".concat(str.slice(0, -1), "}");
+  }
+  function genChildren(el) {
+    var children = el.children;
+    if (children && children.length > 0) {
+      return "".concat(children.map(function (c) {
+        return gen(c);
+      }).join(','));
+    } else {
+      return false;
+    }
+  }
+  function gen(node) {
+    if (node.type === 1) {
+      // 元素标签
+      return generate(node);
+    } else {
+      var text = node.text; // a {{ name }} b{{age}}  c
+      var tokens = [];
+      var match, index;
+      // 每次的偏移量
+      var lastIndex = defaultTagRE.lastIndex = 0; // 正则的问题：lastIndex
+      // 只要是全局匹配，就需要将lastIndex每次匹配的时候调到0处
+      while (match = defaultTagRE.exec(text)) {
+        index = match.index;
+        if (index > lastIndex) {
+          tokens.push(JSON.stringify(text.slice(lastIndex, index)));
+        }
+        tokens.push("_s(".concat(match[1].trim(), ")"));
+        lastIndex = index + match[0].length;
+      }
+      if (lastIndex < text.length) {
+        // 最后的
+        tokens.push(JSON.stringify(text.slice(lastIndex)));
+      }
+      return "_v(".concat(tokens.join('+'), ")");
+    }
+  }
+  function generate(el) {
+    var children = genChildren(el);
+    var code = "_c(\"".concat(el.tag, "\", ").concat(el.attrs.length ? getProps(el.attrs) : 'undefined').concat(el.children ? ",".concat(children) : '', ")\n    ");
+    return code;
+  }
 
   // 主要通过正则匹配加循环来完成的
   // 把一个HTML不停地循环拿出来后组成一棵树，这个树描述了我们当前的DOM结构
   function compilerToFunction(template) {
     // 1、解析HTML字符串，将HTML字符串 -》ast语法树
     var root = parseHTML(template);
+    // 2、需要将ast语法树生成最终的render函数    就是字符串拼接（模板引擎）
     console.log(root);
-    return function render() {};
+    var code = generate(root);
+    console.log(code);
+
+    // 核心思路：就是讲模板转换成 下面这段字符串
+    // <div id="app"><p>hello {{name}}</p>hello</div>
+    // 将ast树 再次转成js的语法
+    // _c('div', {id: 'app'}, _c('p', _v('hello' + _s(name))), _v('hello'))
+
+    // 所有的模板引擎实现，都需要new Function() + with
+
+    var renderFn = new Function("with(this) {return ".concat(code, "}"));
+    console.log(renderFn);
+    // vue的render 返回的是虚拟DOM
+    return renderFn;
   }
+
+  // Vue实例为什么只能有一个根元素？
+  // 在 Vue.js 2. x 版本中， 一个 Vue 实例只能有一个根元素， 这是因为 Vue.js 的模板编译器在编译模板时需要将模板编译为一个渲染函数， 并将这个渲染函数挂载到根元素上。 如果一个 Vue 实例有多个根元素， 那么模板编译器就无法将模板编译为一个渲染函数。
+  // 在 Vue.js 3.x 版本中，这个限制已经被移除了。Vue.js 3.x 版本中可以在一个 Vue 实例中包含多个根元素，可以通过在根元素上使用 v-for、v-if 等指令来实现。在 Vue.js 3.x 版本中，一个 Vue 实例不再需要一个单一的根元素，而是将多个根元素封装在一个特殊的组件中，这个组件被称为 Fragment。
 
   // 初始化
   function initMixin(Vue) {
@@ -372,10 +505,11 @@
         if (!template && el) {
           template = el.outerHTML;
         }
-        console.log(template);
+        // console.log(template)
         // 我们需要将template 转化成render函数
         var render = compilerToFunction(template);
         options.render = render;
+        console.log(options.render);
       }
     };
   }
