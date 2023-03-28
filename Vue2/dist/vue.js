@@ -475,10 +475,95 @@
   // 在 Vue.js 2. x 版本中， 一个 Vue 实例只能有一个根元素， 这是因为 Vue.js 的模板编译器在编译模板时需要将模板编译为一个渲染函数， 并将这个渲染函数挂载到根元素上。 如果一个 Vue 实例有多个根元素， 那么模板编译器就无法将模板编译为一个渲染函数。
   // 在 Vue.js 3.x 版本中，这个限制已经被移除了。Vue.js 3.x 版本中可以在一个 Vue 实例中包含多个根元素，可以通过在根元素上使用 v-for、v-if 等指令来实现。在 Vue.js 3.x 版本中，一个 Vue 实例不再需要一个单一的根元素，而是将多个根元素封装在一个特殊的组件中，这个组件被称为 Fragment。
 
+  var Watcher = /*#__PURE__*/function () {
+    function Watcher(vm, exprOrFn, callback, options) {
+      _classCallCheck(this, Watcher);
+      this.vm = vm;
+      this.callback = callback;
+      this.options = options;
+      this.getter = exprOrFn; // 将内部传过来的回调函数 放到getter属性上
+
+      this.get();
+    }
+    _createClass(Watcher, [{
+      key: "get",
+      value: function get() {
+        this.getter(); // 就是让updateComponent函数执行
+      }
+    }]);
+    return Watcher;
+  }();
+
+  /**
+   * 初渲染或者更新
+   * @param {*} oldVnode // 第一次是#app，第二次就是老的虚拟节点
+   * @param {*} vnode  // 新的虚拟节点
+   */
+  function patch(oldVnode, vnode) {
+    console.log(oldVnode, vnode);
+    // 递归创建真实节点   替换掉老的节点
+    // 1、判断是更新还是渲染
+    var isRealElement = oldVnode.nodeType; // 真实元素节点
+    if (isRealElement) {
+      var odlElm = oldVnode; // div id="app"老的真实节点
+      var parentElm = odlElm.parentNode; // body 老的真实节点的父亲
+
+      var el = createElm(vnode);
+      parentElm.insertBefore(el, odlElm.nextSibling);
+      parentElm.removeChild(odlElm); // 删除老的节点
+    }
+  }
+  // 根据虚拟节点，创建真实节点
+  function createElm(vnode) {
+    var tag = vnode.tag,
+      children = vnode.children;
+      vnode.key;
+      vnode.data;
+      var text = vnode.text;
+    // 是标签就创建标签
+    if (typeof tag === 'string') {
+      vnode.el = document.createElement(tag);
+      updateProperties(vnode);
+      children.forEach(function (child) {
+        // 递归创建儿子节点，将儿子节点放到父节点中
+        return vnode.el.appendChild(createElm(child));
+      });
+    } else {
+      // 如果不是标签就是文本
+      // 虚拟DOM上映射着真实DOM，方便后续更新操作
+      vnode.el = document.createTextNode(text);
+    }
+    return vnode.el;
+  }
+
+  // 更新属性
+  function updateProperties(vnode) {
+    var newProps = vnode.data;
+    var el = vnode.el;
+    console.log(newProps, el);
+    for (var key in newProps) {
+      if (key === 'style') {
+        for (var styleName in newProps.style) {
+          el.style[styleName] = newProps.style[styleName];
+        }
+      } else if (key === 'class') {
+        el.className = newProps["class"];
+      } else {
+        el.setAttribute(key, newProps[key]);
+      }
+    }
+  }
+
   function lifecycleMixin(Vue) {
     // vnode虚拟节点
-    Vue.prototype._update = function (vnode) {};
+    Vue.prototype._update = function (vnode) {
+      var vm = this;
+      // 我要通过虚拟节点，渲染出真实的DOM
+      vm.$el = patch(vm.$el, vnode); // 需要用虚拟节点创建出真实节点  替换掉真实的$el
+      // console.log(vnode)
+    };
   }
+
   function mountComponent(vm, el) {
     var options = vm.$options; // render
     vm.$el = el; // 真实的DOM元素
@@ -500,7 +585,7 @@
   }
 
   // Watcher 就是用来渲染的
-  // vm._render 通过解析的render方法 渲染出虚拟DOM
+  // vm._render 通过解析的render方法 渲染出虚拟DOM  _c _v _s
   // vm._update 通过虚拟DOM  创建真实的DOM
 
   // 初始化
@@ -561,21 +646,81 @@
   //     console.log('data', data)
   // }
 
-  function renderMixin() {
-    Vue.prototype._render = function () {};
+  function createElement(tag) {
+    var data = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    var key = data.key;
+    if (key) {
+      delete data.key;
+    }
+    for (var _len = arguments.length, children = new Array(_len > 2 ? _len - 2 : 0), _key = 2; _key < _len; _key++) {
+      children[_key - 2] = arguments[_key];
+    }
+    return vnode(tag, data, key, children, undefined);
+  }
+  function createTextNode(text) {
+    return vnode(undefined, undefined, undefined, undefined, text);
+  }
+
+  /**
+   * 产生虚拟节点
+   * @param {*} tag 标签名
+   * @param {*} data 属性
+   * @param {*} key 做diff
+   * @param {*} children 孩子
+   * @param {*} text 文本
+   */
+  function vnode(tag, data, key, children, text) {
+    return {
+      tag: tag,
+      data: data,
+      key: key,
+      children: children,
+      text: text
+    };
+  }
+  // 虚拟节点  就是通过_c _V实现用对象来描述dom的操作
+
+  /**
+   * 1、将template转换成ast语法树 -> 生成render函数 -> 生成虚拟DOM -> 真实的DOM
+   * 重新生成虚拟DOM -> 更新DOM
+   */
+
+  function renderMixin(Vue) {
+    // _c 创建元素的虚拟节点
+    // _v 创建文本的虚拟节点
+    // _s JSON.stringify()
+    Vue.prototype._c = function () {
+      return createElement.apply(void 0, arguments); // tag, data, children...
+    };
+
+    Vue.prototype._v = function (text) {
+      return createTextNode(text);
+    };
+    // 把数据格式为字符串
+    Vue.prototype._s = function (val) {
+      return val === null ? '' : _typeof(val) === 'object' ? JSON.stringify(val) : val;
+    };
+    Vue.prototype._render = function () {
+      console.log('render');
+      var vm = this;
+      var render = vm.$options.render;
+      var vnode = render.call(vm); // 改变this指向
+
+      return vnode; // 虚拟DOM
+    };
   }
 
   // vue源码里没有直接使用class定义一个类。类的特点：将所有的方法都耦合在一起，功能越来越多，很难维护。vue在设计的时候使用构造函数，把扩展的内容挂载到原型上，放到不同的文件中，好维护。
-  function Vue$1(options) {
+  function Vue(options) {
     this._init(options);
   }
 
   // 初始化
-  initMixin(Vue$1); // 扩展了init方法
-  renderMixin();
-  lifecycleMixin(Vue$1);
+  initMixin(Vue); // 扩展了init方法
+  renderMixin(Vue);
+  lifecycleMixin(Vue);
 
-  return Vue$1;
+  return Vue;
 
 }));
 //# sourceMappingURL=vue.js.map
