@@ -35,7 +35,7 @@ methods.forEach(method => {
             default:
                 break;
         }
-        console.log('inserted', inserted) // 新增的内容
+        // console.log('inserted', inserted) // 新增的内容
         if (inserted) { // inserted是数组类型，观察数组，要调用observeArray方法
             ob.observeArray(inserted)
         }

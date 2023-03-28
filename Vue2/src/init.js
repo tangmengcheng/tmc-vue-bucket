@@ -5,11 +5,14 @@ import {
 import {
     compilerToFunction
 } from './compiler/index.js'
+import {
+    mountComponent
+} from "./lifecycle"
 
 // 初始化
 export function initMixin(Vue) {
     Vue.prototype._init = function (options) {
-        console.log('options', options)
+        // console.log('options', options)
         // 在当前的实例上扩展一些属性$options $data...
         // 为什么要定义这些属性？如果使用使用options的话，在其他扩展方法里拿不到。扩展一些属性，可以通过this拿到这个属性
         // 为什么属性要以$开头，认为是Vue自己的属性。如果自己在data中用$定义变量，实例上拿不到的
@@ -44,8 +47,10 @@ export function initMixin(Vue) {
             // 我们需要将template 转化成render函数
             const render = compilerToFunction(template)
             options.render = render
-            console.log(options.render)
         }
+
+        // 渲染当前的组件，挂载这个组件
+        mountComponent(vm, el)
     }
 }
 

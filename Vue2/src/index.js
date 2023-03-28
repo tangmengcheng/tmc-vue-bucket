@@ -3,6 +3,12 @@
 import {
     initMixin
 } from "./init"
+import {
+    renderMixin
+} from './render'
+import {
+    lifecycleMixin
+} from './lifecycle'
 
 function Vue(options) {
     this._init(options)
@@ -10,6 +16,8 @@ function Vue(options) {
 
 // 初始化
 initMixin(Vue) // 扩展了init方法
+renderMixin(Vue)
+lifecycleMixin(Vue)
 // Vue.prototype._init = function () {
 
 // }

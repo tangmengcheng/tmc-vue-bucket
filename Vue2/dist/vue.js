@@ -132,7 +132,7 @@
           // arr.splice(0, 1, {}, {}...)
           inserted = args.slice(2);
       }
-      console.log('inserted', inserted); // 新增的内容
+      // console.log('inserted', inserted) // 新增的内容
       if (inserted) {
         // inserted是数组类型，观察数组，要调用observeArray方法
         ob.observeArray(inserted);
@@ -372,9 +372,10 @@
           advance(_end[0].length); // 去掉开始标签的 > 
           return match;
         }
-        console.log(html, match);
+        // console.log(html, match)
       }
     }
+
     return root;
   }
 
@@ -452,9 +453,10 @@
     // 1、解析HTML字符串，将HTML字符串 -》ast语法树
     var root = parseHTML(template);
     // 2、需要将ast语法树生成最终的render函数    就是字符串拼接（模板引擎）
-    console.log(root);
+    // console.log(root)
+
     var code = generate(root);
-    console.log(code);
+    // console.log(code)
 
     // 核心思路：就是讲模板转换成 下面这段字符串
     // <div id="app"><p>hello {{name}}</p>hello</div>
@@ -464,7 +466,7 @@
     // 所有的模板引擎实现，都需要new Function() + with
 
     var renderFn = new Function("with(this) {return ".concat(code, "}"));
-    console.log(renderFn);
+    // console.log(renderFn)
     // vue的render 返回的是虚拟DOM
     return renderFn;
   }
@@ -473,10 +475,38 @@
   // 在 Vue.js 2. x 版本中， 一个 Vue 实例只能有一个根元素， 这是因为 Vue.js 的模板编译器在编译模板时需要将模板编译为一个渲染函数， 并将这个渲染函数挂载到根元素上。 如果一个 Vue 实例有多个根元素， 那么模板编译器就无法将模板编译为一个渲染函数。
   // 在 Vue.js 3.x 版本中，这个限制已经被移除了。Vue.js 3.x 版本中可以在一个 Vue 实例中包含多个根元素，可以通过在根元素上使用 v-for、v-if 等指令来实现。在 Vue.js 3.x 版本中，一个 Vue 实例不再需要一个单一的根元素，而是将多个根元素封装在一个特殊的组件中，这个组件被称为 Fragment。
 
+  function lifecycleMixin(Vue) {
+    // vnode虚拟节点
+    Vue.prototype._update = function (vnode) {};
+  }
+  function mountComponent(vm, el) {
+    var options = vm.$options; // render
+    vm.$el = el; // 真实的DOM元素
+
+    console.log(options, vm.$el);
+    // 渲染页面
+
+    // 渲染方法
+    var updateComponent = function updateComponent() {
+      // 无论是渲染还是更新都会调用此方法
+      // _render() 返回虚拟DOM
+      // _update() 将虚拟DOM转换成真实的DOM
+      vm._update(vm._render());
+    };
+
+    // 怎么渲染呢？就是利用渲染watcher; 每个组件都有一个watcher
+    // () => {} ===> $watch(() => {}) 表示里面的回调函数
+    new Watcher(vm, updateComponent, function () {}, true); // true 表示它是一个渲染watcher
+  }
+
+  // Watcher 就是用来渲染的
+  // vm._render 通过解析的render方法 渲染出虚拟DOM
+  // vm._update 通过虚拟DOM  创建真实的DOM
+
   // 初始化
   function initMixin(Vue) {
     Vue.prototype._init = function (options) {
-      console.log('options', options);
+      // console.log('options', options)
       // 在当前的实例上扩展一些属性$options $data...
       // 为什么要定义这些属性？如果使用使用options的话，在其他扩展方法里拿不到。扩展一些属性，可以通过this拿到这个属性
       // 为什么属性要以$开头，认为是Vue自己的属性。如果自己在data中用$定义变量，实例上拿不到的
@@ -509,8 +539,10 @@
         // 我们需要将template 转化成render函数
         var render = compilerToFunction(template);
         options.render = render;
-        console.log(options.render);
       }
+
+      // 渲染当前的组件，挂载这个组件
+      mountComponent(vm, el);
     };
   }
 
@@ -529,15 +561,21 @@
   //     console.log('data', data)
   // }
 
+  function renderMixin() {
+    Vue.prototype._render = function () {};
+  }
+
   // vue源码里没有直接使用class定义一个类。类的特点：将所有的方法都耦合在一起，功能越来越多，很难维护。vue在设计的时候使用构造函数，把扩展的内容挂载到原型上，放到不同的文件中，好维护。
-  function Vue(options) {
+  function Vue$1(options) {
     this._init(options);
   }
 
   // 初始化
-  initMixin(Vue); // 扩展了init方法
+  initMixin(Vue$1); // 扩展了init方法
+  renderMixin();
+  lifecycleMixin(Vue$1);
 
-  return Vue;
+  return Vue$1;
 
 }));
 //# sourceMappingURL=vue.js.map

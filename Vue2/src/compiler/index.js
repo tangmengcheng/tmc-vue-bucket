@@ -78,10 +78,10 @@ export function compilerToFunction(template) {
     // 1、解析HTML字符串，将HTML字符串 -》ast语法树
     let root = parseHTML(template)
     // 2、需要将ast语法树生成最终的render函数    就是字符串拼接（模板引擎）
-    console.log(root)
+    // console.log(root)
 
     let code = generate(root)
-    console.log(code)
+    // console.log(code)
 
     // 核心思路：就是讲模板转换成 下面这段字符串
     // <div id="app"><p>hello {{name}}</p>hello</div>
@@ -91,7 +91,7 @@ export function compilerToFunction(template) {
     // 所有的模板引擎实现，都需要new Function() + with
 
     let renderFn = new Function(`with(this) {return ${code}}`)
-    console.log(renderFn)
+    // console.log(renderFn)
     // vue的render 返回的是虚拟DOM
     return renderFn
 }
