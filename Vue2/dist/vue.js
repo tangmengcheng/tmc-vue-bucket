@@ -267,12 +267,16 @@
   // const comment = /^<!\--/
   // const conditionalComment = /^<!\[/ // 解析是否是条件注释
 
+  // 拿到这些标签了后就需要生成一个树，AST树就有树根
   var root = null; // ast语法树的树根
   var currentParent; // 标识当前父亲是谁
+  // 面试题：我怎么知道标签正常关闭了？
+  // 【div, p, span】
   var stack = [];
   var ELEMENT_TYPE = 1; // 元素
   var TEXT_TYPE = 3; // 文本
 
+  // 创建语法树的方法
   function createASTElement(tagName, attrs) {
     return {
       tag: tagName,
@@ -282,7 +286,7 @@
       parent: null
     };
   }
-
+  // 把我需要的内容收集起来
   // 开始
   function start(tagName, attrs) {
     console.log('开始标签：', tagName, '属性是：', attrs);
@@ -330,18 +334,22 @@
           start(startTagMatch.tagName, startTagMatch.attrs); // 1、解析开始标签
           continue; // 如果开始标签匹配完毕后，继续下一次
         }
-
-        var endTagMatch = html.match(endTag); // 结束标签
+        // 如果没有匹配到开始标签  可能匹配结束标签
+        var endTagMatch = html.match(endTag); // 结束标签（没有属性）
         if (endTagMatch) {
           advance(endTagMatch[0].length);
           end(endTagMatch[1]); // 2、解析结束标签
           continue;
         }
+        // 。。。注解节点，特殊元素style。。。
       }
+
       var text = void 0;
       if (textEnd >= 0) {
-        text = html.substring(0, textEnd);
+        // 有可能有空格，默认说它是文本
+        text = html.substring(0, textEnd); // 截取空格文本
       }
+
       if (text) {
         advance(text.length); // 去掉空的字符串
         chars(text); // 3、解析文本
@@ -349,17 +357,21 @@
     }
 
     function advance(n) {
-      html = html.substring(n);
+      html = html.substring(n); // 默认从当前位置截取到最后
     }
+
     function parseStartTag() {
       var start = html.match(startTagOpen);
       if (start) {
+        // 如果匹配到
         var match = {
           tagName: start[1],
           attrs: []
         };
         advance(start[0].length); // 将标签删除
         // console.log(html)
+        // 需要判断标签有没有属性，有属性就解析属性，没有属性就不解析，属性有可能多个，就需要循环去取
+        // html.match(startTagClose)如果匹配到结束标签
         var _end, attr;
         while (!(_end = html.match(startTagClose)) && (attr = html.match(attribute))) {
           advance(attr[0].length); // 将属性删除
@@ -383,11 +395,12 @@
 
   // 处理属性  拼接成属性字符串
   function getProps(attrs) {
+    // [{name: 'id', value: 'app'}, {}]
     var str = '';
     var _loop = function _loop() {
       var attr = attrs[i];
       if (attr.name === 'style') {
-        // style="color: red;fontSize: 14px;"  => {style: {color: 'red'}}
+        // style="color: red;fontSize: 14px;"  => {style: {color: 'red'}} 为了diff
         var obj = {};
         attr.value.split(';').forEach(function (item) {
           var _item$split = item.split(':'),
@@ -403,15 +416,17 @@
     for (var i = 0; i < attrs.length; i++) {
       _loop();
     }
-    return "{".concat(str.slice(0, -1), "}");
+    return "{".concat(str.slice(0, -1), "}"); // 删除最后一个逗号
   }
+
   function genChildren(el) {
     var children = el.children;
     if (children && children.length > 0) {
       return "".concat(children.map(function (c) {
         return gen(c);
-      }).join(','));
+      }).join(',')); // 把一个个孩子生成字符串
     } else {
+      // 没有孩子
       return false;
     }
   }
@@ -420,12 +435,13 @@
       // 元素标签
       return generate(node);
     } else {
-      var text = node.text; // a {{ name }} b{{age}}  c
+      // 文本的情况有点复杂：肯能包含{{}}
+      var text = node.text; // a {{ name }} b{{age}}  c  ===》_v("a" + _s(name) + "b" + _s(age) + "c")
       var tokens = [];
       var match, index;
       // 每次的偏移量
-      var lastIndex = defaultTagRE.lastIndex = 0; // 正则的问题：lastIndex
-      // 只要是全局匹配，就需要将lastIndex每次匹配的时候调到0处
+      var lastIndex = defaultTagRE.lastIndex = 0; // 正则的问题：lastIndex   let reg = /a/g reg.test('abc')
+      // 只要是全局匹配，就需要将lastIndex每次匹配的时候调到0处  
       while (match = defaultTagRE.exec(text)) {
         index = match.index;
         if (index > lastIndex) {
@@ -470,10 +486,6 @@
     // vue的render 返回的是虚拟DOM
     return renderFn;
   }
-
-  // Vue实例为什么只能有一个根元素？
-  // 在 Vue.js 2. x 版本中， 一个 Vue 实例只能有一个根元素， 这是因为 Vue.js 的模板编译器在编译模板时需要将模板编译为一个渲染函数， 并将这个渲染函数挂载到根元素上。 如果一个 Vue 实例有多个根元素， 那么模板编译器就无法将模板编译为一个渲染函数。
-  // 在 Vue.js 3.x 版本中，这个限制已经被移除了。Vue.js 3.x 版本中可以在一个 Vue 实例中包含多个根元素，可以通过在根元素上使用 v-for、v-if 等指令来实现。在 Vue.js 3.x 版本中，一个 Vue 实例不再需要一个单一的根元素，而是将多个根元素封装在一个特殊的组件中，这个组件被称为 Fragment。
 
   var Watcher = /*#__PURE__*/function () {
     function Watcher(vm, exprOrFn, callback, options) {

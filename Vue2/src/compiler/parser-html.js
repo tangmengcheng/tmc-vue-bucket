@@ -14,12 +14,16 @@ const endTag = new RegExp(`^<\\/${qnameCapture}[^>]*>`) // 匹配标签结尾的
 // const comment = /^<!\--/
 // const conditionalComment = /^<!\[/ // 解析是否是条件注释
 
+// 拿到这些标签了后就需要生成一个树，AST树就有树根
 let root = null // ast语法树的树根
 let currentParent // 标识当前父亲是谁
+// 面试题：我怎么知道标签正常关闭了？
+// 【div, p, span】
 let stack = []
 const ELEMENT_TYPE = 1 // 元素
 const TEXT_TYPE = 3 // 文本
 
+// 创建语法树的方法
 function createASTElement(tagName, attrs) {
     return {
         tag: tagName,
@@ -29,7 +33,7 @@ function createASTElement(tagName, attrs) {
         parent: null
     }
 }
-
+// 把我需要的内容收集起来
 // 开始
 function start(tagName, attrs) {
     console.log('开始标签：', tagName, '属性是：', attrs)
@@ -77,16 +81,18 @@ export function parseHTML(html) {
                 start(startTagMatch.tagName, startTagMatch.attrs) // 1、解析开始标签
                 continue // 如果开始标签匹配完毕后，继续下一次
             }
-            let endTagMatch = html.match(endTag) // 结束标签
+            // 如果没有匹配到开始标签  可能匹配结束标签
+            let endTagMatch = html.match(endTag) // 结束标签（没有属性）
             if (endTagMatch) {
                 advance(endTagMatch[0].length)
                 end(endTagMatch[1]) // 2、解析结束标签
                 continue
             }
+            // 。。。注解节点，特殊元素style。。。
         }
         let text
-        if (textEnd >= 0) {
-            text = html.substring(0, textEnd)
+        if (textEnd >= 0) { // 有可能有空格，默认说它是文本
+            text = html.substring(0, textEnd) // 截取空格文本
         }
         if (text) {
             advance(text.length) // 去掉空的字符串
@@ -95,18 +101,20 @@ export function parseHTML(html) {
     }
 
     function advance(n) {
-        html = html.substring(n)
+        html = html.substring(n) // 默认从当前位置截取到最后
     }
 
     function parseStartTag() {
         let start = html.match(startTagOpen)
-        if (start) {
+        if (start) { // 如果匹配到
             const match = {
                 tagName: start[1],
                 attrs: []
             }
             advance(start[0].length) // 将标签删除
             // console.log(html)
+            // 需要判断标签有没有属性，有属性就解析属性，没有属性就不解析，属性有可能多个，就需要循环去取
+            // html.match(startTagClose)如果匹配到结束标签
             let end, attr
             while (!(end = html.match(startTagClose)) && (attr = html.match(attribute))) {
                 advance(attr[0].length) // 将属性删除
